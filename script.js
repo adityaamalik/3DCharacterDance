@@ -2,6 +2,8 @@ const audioInput = document.getElementById("audio");
 let noise = new SimplexNoise();
 const area = document.getElementById("visualizer");
 const label = document.getElementById("label");
+const stepDisplay = document.getElementById("step-display");
+const bpmDisplay = document.getElementById("bpm-display");
 audioInput.addEventListener("change", setAudio, false);
 let audio = new Audio("");
 
@@ -19,6 +21,10 @@ let beatDetector = null; // Beat detector instance
 let lastBeatTime = 0;
 let currentTempo = 0;
 let beatCount = 0;
+let bpmHistory = [];
+let dynamicThresholds = { slow: 0, medium: 0, fast: 0, veryFast: 0 };
+let isCalibrating = true;
+let calibrationStartTime = 0;
 let track1, track2, track3, track4, track5;
 
 // Vibrant and contrasting colors for each ring
@@ -46,9 +52,8 @@ function setupAudioContext() {
   setupBeatDetector(src);
 }
 
-// Simple custom beat detection using Web Audio API
+// Enhanced beat detection with dynamic BPM analysis
 function setupBeatDetector(audioSource) {
-  // Create a separate analyser for beat detection
   const beatAnalyser = audioContext.createAnalyser();
   audioSource.connect(beatAnalyser);
   beatAnalyser.fftSize = 512;
@@ -57,12 +62,15 @@ function setupBeatDetector(audioSource) {
   let lastBeat = 0;
   let beatHistory = [];
   let energyHistory = [];
-
-  // Start beat detection loop
+  
+  // Reset calibration for new track
+  isCalibrating = true;
+  calibrationStartTime = audioContext.currentTime;
+  bpmHistory = [];
+  
   setInterval(() => {
     beatAnalyser.getByteFrequencyData(dataArray);
 
-    // Calculate energy in bass frequencies (0-60 Hz approximately)
     const bassEnd = Math.floor(
       (60 * beatAnalyser.frequencyBinCount) / (audioContext.sampleRate / 2)
     );
@@ -72,60 +80,131 @@ function setupBeatDetector(audioSource) {
     }
     bassEnergy = bassEnergy / bassEnd;
 
-    // Store energy history for tempo calculation
     energyHistory.push(bassEnergy);
-    if (energyHistory.length > 100) energyHistory.shift(); // Keep last 100 samples
+    if (energyHistory.length > 100) energyHistory.shift();
 
-    // Simple beat detection: look for energy spikes
-    const avgEnergy =
-      energyHistory.reduce((a, b) => a + b, 0) / energyHistory.length;
-    const threshold = avgEnergy * 1.3; // 30% above average
+    const avgEnergy = energyHistory.reduce((a, b) => a + b, 0) / energyHistory.length;
+    const threshold = avgEnergy * 1.3;
 
     const now = audioContext.currentTime;
-    if (bassEnergy > threshold && now - lastBeat > 0.3) {
-      // Min 300ms between beats
+    if (bassEnergy > threshold && now - lastBeat > 0.25) {
       beatHistory.push(now);
       lastBeat = now;
       beatCount++;
 
-      // Calculate BPM from recent beats
       if (beatHistory.length > 4) {
-        beatHistory = beatHistory.slice(-8); // Keep last 8 beats
+        beatHistory = beatHistory.slice(-10);
         const intervals = [];
         for (let i = 1; i < beatHistory.length; i++) {
           intervals.push(beatHistory[i] - beatHistory[i - 1]);
         }
-        const avgInterval =
-          intervals.reduce((a, b) => a + b, 0) / intervals.length;
-        const estimatedBPM = 60 / avgInterval;
+        
+        // Use median instead of average for more stable BPM
+        intervals.sort((a, b) => a - b);
+        const medianInterval = intervals[Math.floor(intervals.length / 2)];
+        const estimatedBPM = 60 / medianInterval;
 
-        // Update tempo if it's reasonable (30-200 BPM)
         if (estimatedBPM >= 30 && estimatedBPM <= 200) {
           currentTempo = estimatedBPM;
+          
+          // Update BPM display
+          bpmDisplay.textContent = `BPM: ${Math.round(estimatedBPM)}`;
+          
+          // Collect BPM data during calibration period
+          if (isCalibrating && now - calibrationStartTime < 30) {
+            bpmHistory.push(estimatedBPM);
+            if (bpmHistory.length > 50) bpmHistory.shift();
+          } else if (isCalibrating) {
+            // Calibration complete - calculate dynamic thresholds
+            calculateDynamicThresholds();
+            isCalibrating = false;
+          }
+          
           updateDanceStepFromTempo(estimatedBPM);
         }
       }
     }
-  }, 50); // Check every 50ms
+  }, 40);
 }
 
-// Update dance step based on tempo analysis
+// Calculate dynamic thresholds based on track's BPM distribution
+function calculateDynamicThresholds() {
+  if (bpmHistory.length < 10) {
+    // Fallback to default thresholds if insufficient data
+    dynamicThresholds = { slow: 70, medium: 90, fast: 120, veryFast: 150 };
+    return;
+  }
+  
+  // Sort BPM values and calculate percentiles
+  const sortedBPM = [...bpmHistory].sort((a, b) => a - b);
+  const min = sortedBPM[0];
+  const max = sortedBPM[sortedBPM.length - 1];
+  const range = max - min;
+  
+  // Use weighted distribution based on musical characteristics
+  if (range < 20) {
+    // Narrow range - likely consistent tempo track
+    const center = (min + max) / 2;
+    dynamicThresholds.slow = center - 8;
+    dynamicThresholds.medium = center - 3;
+    dynamicThresholds.fast = center + 3;
+    dynamicThresholds.veryFast = center + 8;
+  } else {
+    // Wide range - variable tempo track
+    // Use 25th, 50th, 75th percentiles with musical weighting
+    const q1 = sortedBPM[Math.floor(sortedBPM.length * 0.25)];
+    const median = sortedBPM[Math.floor(sortedBPM.length * 0.5)];
+    const q3 = sortedBPM[Math.floor(sortedBPM.length * 0.75)];
+    
+    dynamicThresholds.slow = Math.max(min + range * 0.15, q1 - 5);
+    dynamicThresholds.medium = Math.max(q1 + 5, median - 10);
+    dynamicThresholds.fast = Math.max(median + 5, q3 - 8);
+    dynamicThresholds.veryFast = Math.max(q3 + 3, max - range * 0.1);
+  }
+  
+  console.log('Dynamic thresholds calculated:', dynamicThresholds);
+}
+
+// Enhanced dance step selection with dynamic thresholds
 function updateDanceStepFromTempo(bpm) {
   let targetStep;
-
-  if (bpm >= 130) {
+  
+  // Use dynamic thresholds if available, otherwise fallback
+  const thresholds = isCalibrating ? 
+    { slow: 70, medium: 90, fast: 120, veryFast: 150 } : 
+    dynamicThresholds;
+  
+  if (bpm >= thresholds.veryFast) {
+    targetStep = 3; // Very high tempo - most energetic
+  } else if (bpm >= thresholds.fast) {
     targetStep = 3; // High tempo - energetic dancing
-  } else if (bpm >= 90) {
+  } else if (bpm >= thresholds.medium) {
     targetStep = 2; // Medium tempo - moderate dancing
-  } else if (bpm >= 70) {
+  } else if (bpm >= thresholds.slow) {
     targetStep = 1; // Slow tempo - gentle movements
   } else {
-    targetStep = 0; // Very slow or no clear tempo - idle
+    targetStep = 0; // Very slow or unclear tempo - idle
   }
 
-  // Only switch if we detect a significant change
-  if (targetStep !== currentStep) {
+  // Add hysteresis to prevent rapid switching
+  const currentThreshold = getCurrentThreshold(currentStep, thresholds);
+  const hysteresis = 5; // BPM buffer to prevent oscillation
+  
+  if (targetStep > currentStep && bpm > currentThreshold + hysteresis) {
     switchToStep(targetStep);
+  } else if (targetStep < currentStep && bpm < currentThreshold - hysteresis) {
+    switchToStep(targetStep);
+  }
+}
+
+// Helper function to get current step's threshold
+function getCurrentThreshold(step, thresholds) {
+  switch(step) {
+    case 0: return thresholds.slow;
+    case 1: return thresholds.medium;
+    case 2: return thresholds.fast;
+    case 3: return thresholds.veryFast;
+    default: return thresholds.slow;
   }
 }
 
@@ -183,6 +262,9 @@ function switchToStep(stepIndex) {
   }
 
   currentStep = stepIndex;
+  
+  // Update step display
+  stepDisplay.textContent = `Step: ${stepIndex}`;
 }
 
 function setAudio() {
@@ -222,40 +304,60 @@ area.addEventListener("click", () => {
 audio.addEventListener("ended", () => {
   label.style.display = "flex";
   switchToStep(0); // Return to idle when audio ends
+  bpmDisplay.textContent = "BPM: --"; // Reset BPM display
   stopStepProgression();
 });
 
-// Beat-reactive step progression
+// Beat-reactive step progression with calibration reset
 function startStepProgression() {
-  // Reset beat tracking
+  // Reset all tracking variables for new song
   beatCount = 0;
   currentTempo = 0;
+  bpmHistory = [];
+  isCalibrating = true;
+  calibrationStartTime = audioContext ? audioContext.currentTime : 0;
 
-  // Start with step0 (idle) and let beat detection drive changes
   switchToStep(0);
 
-  // Optional: fallback tempo detection if beat detector doesn't work immediately
   if (stepProgressionInterval) clearInterval(stepProgressionInterval);
 
   stepProgressionInterval = setInterval(() => {
-    // Fallback: analyze frequency data for basic tempo estimation
-    if (currentTempo === 0 && analyser) {
-      analyser.getByteFrequencyData(new Uint8Array(analyser.frequencyBinCount));
-      // Basic energy detection as fallback
+    // Enhanced fallback with calibration awareness
+    if (analyser) {
       const dataArray = new Uint8Array(analyser.frequencyBinCount);
       analyser.getByteFrequencyData(dataArray);
-      const energy =
-        dataArray.reduce((sum, val) => sum + val, 0) / dataArray.length;
-
-      if (energy > 100) {
-        updateDanceStepFromTempo(130); // Assume medium-high tempo
-      } else if (energy > 50) {
-        updateDanceStepFromTempo(90); // Assume medium tempo
-      } else {
-        updateDanceStepFromTempo(70); // Assume slow tempo
+      
+      // Calculate bass and treble energy for better tempo estimation
+      const bassEnd = Math.floor(dataArray.length * 0.25);
+      const bassEnergy = dataArray.slice(0, bassEnd).reduce((sum, val) => sum + val, 0) / bassEnd;
+      const trebleEnergy = dataArray.slice(bassEnd).reduce((sum, val) => sum + val, 0) / (dataArray.length - bassEnd);
+      
+      // Use energy patterns to estimate tempo during calibration
+      if (isCalibrating && currentTempo === 0) {
+        const totalEnergy = (bassEnergy + trebleEnergy) / 2;
+        let estimatedBPM;
+        
+        if (totalEnergy > 120) {
+          estimatedBPM = 140; // High energy suggests fast tempo
+        } else if (totalEnergy > 80) {
+          estimatedBPM = 110; // Medium energy
+        } else if (totalEnergy > 40) {
+          estimatedBPM = 85; // Low-medium energy
+        } else {
+          estimatedBPM = 65; // Low energy
+        }
+        
+        // Add some variation based on treble/bass ratio
+        const ratio = trebleEnergy / (bassEnergy + 1);
+        if (ratio > 1.5) estimatedBPM += 10; // Treble-heavy = faster
+        if (ratio < 0.7) estimatedBPM -= 8; // Bass-heavy = potentially slower
+        
+        // Update BPM display for fallback estimation too
+        bpmDisplay.textContent = `BPM: ${Math.round(estimatedBPM)}`;
+        updateDanceStepFromTempo(estimatedBPM);
       }
     }
-  }, 1000); // Check every second for fallback
+  }, 1000);
 }
 
 function stopStepProgression() {

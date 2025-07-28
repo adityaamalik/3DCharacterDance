@@ -45,6 +45,34 @@ label:hover{
     font-size: 1rem;
 }
 
+#info-display {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1000;
+}
+
+#dance-info {
+    background: rgba(0, 0, 0, 0.8);
+    color: #00bfff;
+    padding: 10px 15px;
+    border-radius: 8px;
+    border: 2px solid #00bfff;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    font-weight: bold;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    text-shadow: 0 0 10px #00bfff;
+    box-shadow: 0 0 15px rgba(0, 191, 255, 0.3);
+}
+
+#step-display, #bpm-display {
+    display: block;
+    letter-spacing: 1px;
+}
+
 #visualizer {
     cursor: pointer;
     flex: 1;
