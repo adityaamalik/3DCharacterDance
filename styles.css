@@ -38,6 +38,47 @@ label:hover{
     justify-content: center;
     align-items: center;
     gap: 0.4rem;
+    flex-direction: column;
+}
+
+#audio-selector, #audio-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+#filename-display {
+    color: #00bfff;
+    font-family: 'Courier New', monospace;
+    font-weight: bold;
+    padding: 8px 12px;
+    background: rgba(0, 191, 255, 0.1);
+    border: 1px solid #00bfff;
+    border-radius: 8px;
+    text-shadow: 0 0 5px #00bfff;
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#reset-btn {
+    background: linear-gradient(45deg, #ff4444, #cc0000);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-family: Arial, Helvetica, sans-serif;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(255, 68, 68, 0.3);
+}
+
+#reset-btn:hover {
+    background: linear-gradient(45deg, #ff6666, #ff0000);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(255, 68, 68, 0.5);
 }
 
 .text {

@@ -15,8 +15,14 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/FBXLoader.js"></script>
     <script src="https://unpkg.com/web-audio-beat-detector@7.1.0/dist/web-audio-beat-detector.min.js"></script>
     <div id="header">
-      <label for="audio" id="label">Select File</label>
-      <input type="file" id="audio" accept="audio/*" />
+      <div id="audio-selector">
+        <label for="audio" id="label">Select Audio File</label>
+        <input type="file" id="audio" accept="audio/*" />
+      </div>
+      <div id="audio-info" style="display: none;">
+        <div id="filename-display"></div>
+        <button id="reset-btn">Reset</button>
+      </div>
       <div class="text">Click the character to play/pause</div>
     </div>
     <div id="info-display">

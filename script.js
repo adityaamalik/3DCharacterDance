@@ -4,7 +4,12 @@ const area = document.getElementById("visualizer");
 const label = document.getElementById("label");
 const stepDisplay = document.getElementById("step-display");
 const bpmDisplay = document.getElementById("bpm-display");
+const audioSelector = document.getElementById("audio-selector");
+const audioInfo = document.getElementById("audio-info");
+const filenameDisplay = document.getElementById("filename-display");
+const resetBtn = document.getElementById("reset-btn");
 audioInput.addEventListener("change", setAudio, false);
+resetBtn.addEventListener("click", resetApp, false);
 let audio = new Audio("");
 
 // Global dance-related variables
@@ -273,6 +278,12 @@ function setAudio() {
   if (audioFile.type.startsWith("audio/")) {
     const audioURL = URL.createObjectURL(audioFile);
     audio = new Audio(audioURL);
+    
+    // Update UI to show filename and hide selector
+    filenameDisplay.textContent = audioFile.name;
+    audioSelector.style.display = "none";
+    audioInfo.style.display = "flex";
+    
     // Setup audio context for ring animations
     setupAudioContext();
     // Only start visualization if not already started
@@ -364,6 +375,51 @@ function stopStepProgression() {
   if (stepProgressionInterval) {
     clearInterval(stepProgressionInterval);
     stepProgressionInterval = null;
+  }
+}
+
+// Reset the entire application
+function resetApp() {
+  // Stop and reset audio
+  audio.pause();
+  audio.currentTime = 0;
+  audio = new Audio("");
+  
+  // Reset UI elements
+  audioSelector.style.display = "flex";
+  audioInfo.style.display = "none";
+  filenameDisplay.textContent = "";
+  audioInput.value = ""; // Clear file input
+  label.style.display = "flex";
+  
+  // Reset displays
+  stepDisplay.textContent = "Step: 0";
+  bpmDisplay.textContent = "BPM: --";
+  
+  // Reset all tracking variables
+  currentStep = 0;
+  currentTempo = 0;
+  beatCount = 0;
+  bpmHistory = [];
+  isCalibrating = true;
+  calibrationStartTime = 0;
+  dynamicThresholds = { slow: 0, medium: 0, fast: 0, veryFast: 0 };
+  
+  // Stop progression and close audio context
+  stopStepProgression();
+  if (audioContext) {
+    audioContext.close();
+    audioContext = null;
+    analyser = null;
+  }
+  
+  // Reset character visibility
+  if (characters.length > 0) {
+    for (let i = 0; i < Math.min(characters.length, 4); i++) {
+      if (characters[i]) {
+        characters[i].visible = i === 0; // Only step0 visible
+      }
+    }
   }
 }
 
