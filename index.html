@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>3D Audio Visualizer</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="script.js" defer></script>
+    <link rel="icon" href="assets/3daudiofavicon.png" type="image/x-icon" />
+  </head>
+  <body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/simplex-noise/2.3.0/simplex-noise.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/fflate@0.7.4/umd/index.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/FBXLoader.js"></script>
+    <script src="https://unpkg.com/web-audio-beat-detector@7.1.0/dist/web-audio-beat-detector.min.js"></script>
+    <div id="header">
+      <label for="audio" id="label">Select File</label>
+      <input type="file" id="audio" accept="audio/*" />
+      <div class="text">Click the character to play/pause</div>
+    </div>
+    <div id="visualizer"></div>
+  </body>
+</html>
