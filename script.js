@@ -67,12 +67,12 @@ function setupBeatDetector(audioSource) {
   let lastBeat = 0;
   let beatHistory = [];
   let energyHistory = [];
-  
+
   // Reset calibration for new track
   isCalibrating = true;
   calibrationStartTime = audioContext.currentTime;
   bpmHistory = [];
-  
+
   setInterval(() => {
     beatAnalyser.getByteFrequencyData(dataArray);
 
@@ -103,7 +103,7 @@ function setupBeatDetector(audioSource) {
         for (let i = 1; i < beatHistory.length; i++) {
           intervals.push(beatHistory[i] - beatHistory[i - 1]);
         }
-        
+
         // Use median instead of average for more stable BPM
         intervals.sort((a, b) => a - b);
         const medianInterval = intervals[Math.floor(intervals.length / 2)];
@@ -111,10 +111,10 @@ function setupBeatDetector(audioSource) {
 
         if (estimatedBPM >= 30 && estimatedBPM <= 200) {
           currentTempo = estimatedBPM;
-          
+
           // Update BPM display
           bpmDisplay.textContent = `BPM: ${Math.round(estimatedBPM)}`;
-          
+
           // Collect BPM data during calibration period
           if (isCalibrating && now - calibrationStartTime < 30) {
             bpmHistory.push(estimatedBPM);
@@ -124,7 +124,7 @@ function setupBeatDetector(audioSource) {
             calculateDynamicThresholds();
             isCalibrating = false;
           }
-          
+
           updateDanceStepFromTempo(estimatedBPM);
         }
       }
@@ -139,13 +139,13 @@ function calculateDynamicThresholds() {
     dynamicThresholds = { slow: 70, medium: 90, fast: 120, veryFast: 150 };
     return;
   }
-  
+
   // Sort BPM values and calculate percentiles
   const sortedBPM = [...bpmHistory].sort((a, b) => a - b);
   const min = sortedBPM[0];
   const max = sortedBPM[sortedBPM.length - 1];
   const range = max - min;
-  
+
   // Use weighted distribution based on musical characteristics
   if (range < 20) {
     // Narrow range - likely consistent tempo track
@@ -160,25 +160,25 @@ function calculateDynamicThresholds() {
     const q1 = sortedBPM[Math.floor(sortedBPM.length * 0.25)];
     const median = sortedBPM[Math.floor(sortedBPM.length * 0.5)];
     const q3 = sortedBPM[Math.floor(sortedBPM.length * 0.75)];
-    
+
     dynamicThresholds.slow = Math.max(min + range * 0.15, q1 - 5);
     dynamicThresholds.medium = Math.max(q1 + 5, median - 10);
     dynamicThresholds.fast = Math.max(median + 5, q3 - 8);
     dynamicThresholds.veryFast = Math.max(q3 + 3, max - range * 0.1);
   }
-  
+
   console.log('Dynamic thresholds calculated:', dynamicThresholds);
 }
 
 // Enhanced dance step selection with dynamic thresholds
 function updateDanceStepFromTempo(bpm) {
   let targetStep;
-  
+
   // Use dynamic thresholds if available, otherwise fallback
-  const thresholds = isCalibrating ? 
-    { slow: 70, medium: 90, fast: 120, veryFast: 150 } : 
+  const thresholds = isCalibrating ?
+    { slow: 70, medium: 90, fast: 120, veryFast: 150 } :
     dynamicThresholds;
-  
+
   if (bpm >= thresholds.veryFast) {
     targetStep = 3; // Very high tempo - most energetic
   } else if (bpm >= thresholds.fast) {
@@ -194,7 +194,7 @@ function updateDanceStepFromTempo(bpm) {
   // Add hysteresis to prevent rapid switching
   const currentThreshold = getCurrentThreshold(currentStep, thresholds);
   const hysteresis = 5; // BPM buffer to prevent oscillation
-  
+
   if (targetStep > currentStep && bpm > currentThreshold + hysteresis) {
     switchToStep(targetStep);
   } else if (targetStep < currentStep && bpm < currentThreshold - hysteresis) {
@@ -204,7 +204,7 @@ function updateDanceStepFromTempo(bpm) {
 
 // Helper function to get current step's threshold
 function getCurrentThreshold(step, thresholds) {
-  switch(step) {
+  switch (step) {
     case 0: return thresholds.slow;
     case 1: return thresholds.medium;
     case 2: return thresholds.fast;
@@ -267,7 +267,7 @@ function switchToStep(stepIndex) {
   }
 
   currentStep = stepIndex;
-  
+
   // Update step display
   stepDisplay.textContent = `Step: ${stepIndex}`;
 }
@@ -278,12 +278,12 @@ function setAudio() {
   if (audioFile.type.startsWith("audio/")) {
     const audioURL = URL.createObjectURL(audioFile);
     audio = new Audio(audioURL);
-    
+
     // Update UI to show filename and hide selector
     filenameDisplay.textContent = audioFile.name;
     audioSelector.style.display = "none";
     audioInfo.style.display = "flex";
-    
+
     // Setup audio context for ring animations
     setupAudioContext();
     // Only start visualization if not already started
@@ -337,17 +337,17 @@ function startStepProgression() {
     if (analyser) {
       const dataArray = new Uint8Array(analyser.frequencyBinCount);
       analyser.getByteFrequencyData(dataArray);
-      
+
       // Calculate bass and treble energy for better tempo estimation
       const bassEnd = Math.floor(dataArray.length * 0.25);
       const bassEnergy = dataArray.slice(0, bassEnd).reduce((sum, val) => sum + val, 0) / bassEnd;
       const trebleEnergy = dataArray.slice(bassEnd).reduce((sum, val) => sum + val, 0) / (dataArray.length - bassEnd);
-      
+
       // Use energy patterns to estimate tempo during calibration
       if (isCalibrating && currentTempo === 0) {
         const totalEnergy = (bassEnergy + trebleEnergy) / 2;
         let estimatedBPM;
-        
+
         if (totalEnergy > 120) {
           estimatedBPM = 140; // High energy suggests fast tempo
         } else if (totalEnergy > 80) {
@@ -357,12 +357,12 @@ function startStepProgression() {
         } else {
           estimatedBPM = 65; // Low energy
         }
-        
+
         // Add some variation based on treble/bass ratio
         const ratio = trebleEnergy / (bassEnergy + 1);
         if (ratio > 1.5) estimatedBPM += 10; // Treble-heavy = faster
         if (ratio < 0.7) estimatedBPM -= 8; // Bass-heavy = potentially slower
-        
+
         // Update BPM display for fallback estimation too
         bpmDisplay.textContent = `BPM: ${Math.round(estimatedBPM)}`;
         updateDanceStepFromTempo(estimatedBPM);
@@ -384,18 +384,18 @@ function resetApp() {
   audio.pause();
   audio.currentTime = 0;
   audio = new Audio("");
-  
+
   // Reset UI elements
   audioSelector.style.display = "flex";
   audioInfo.style.display = "none";
   filenameDisplay.textContent = "";
   audioInput.value = ""; // Clear file input
   label.style.display = "flex";
-  
+
   // Reset displays
   stepDisplay.textContent = "Step: 0";
   bpmDisplay.textContent = "BPM: --";
-  
+
   // Reset all tracking variables
   currentStep = 0;
   currentTempo = 0;
@@ -404,7 +404,7 @@ function resetApp() {
   isCalibrating = true;
   calibrationStartTime = 0;
   dynamicThresholds = { slow: 0, medium: 0, fast: 0, veryFast: 0 };
-  
+
   // Stop progression and close audio context
   stopStepProgression();
   if (audioContext) {
@@ -412,7 +412,7 @@ function resetApp() {
     audioContext = null;
     analyser = null;
   }
-  
+
   // Reset character visibility
   if (characters.length > 0) {
     for (let i = 0; i < Math.min(characters.length, 4); i++) {
@@ -614,12 +614,9 @@ function startVis() {
       modulate(upperAvgFr, 0, 1, 0, 1)
     );
 
-    // Update character animations with consistent timing (only first 4 characters)
-    const fixedDelta = 1 / 60; // 60 FPS equivalent
-
     for (let i = 0; i < Math.min(mixers.length, 4); i++) {
       if (mixers[i]) {
-        mixers[i].update(fixedDelta);
+        mixers[i].update(delta);
       }
     }
 
